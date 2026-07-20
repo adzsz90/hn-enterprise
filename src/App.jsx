@@ -6,16 +6,18 @@ import ProductModal from './components/ProductModal';
 import StockMovementModal from './components/StockMovementModal';
 
 import { 
-  getProducts, 
-  saveProducts, 
-  getTransactions, 
-  saveTransactions, 
-  resetToDefaultData 
-} from './utils/storage';
+  fetchCloudProducts, 
+  pushCloudProducts, 
+  fetchCloudTransactions, 
+  pushCloudTransactions 
+} from './utils/cloudSync';
+
+import { resetToDefaultData } from './utils/storage';
 
 export default function App() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // App mode: 'customer' (Front page for customers) or 'admin' (Admin Control Panel)
   const [viewMode, setViewMode] = useState('customer');
@@ -30,21 +32,48 @@ export default function App() {
   const [movementType, setMovementType] = useState('STOCK_OUT');
   const [selectedProductForMovement, setSelectedProductForMovement] = useState(null);
 
-  // Load initial data from LocalStorage
+  // 1. Initial Load & Realtime Polling Sync (Every 5 seconds)
   useEffect(() => {
-    setProducts(getProducts());
-    setTransactions(getTransactions());
+    let isMounted = true;
+
+    const loadCloudData = async () => {
+      setIsSyncing(true);
+      const prods = await fetchCloudProducts();
+      const txs = await fetchCloudTransactions();
+      if (isMounted) {
+        setProducts(prods);
+        setTransactions(txs);
+        setIsSyncing(false);
+      }
+    };
+
+    loadCloudData();
+
+    // Auto sync interval every 5 seconds across all devices
+    const interval = setInterval(async () => {
+      const prods = await fetchCloudProducts();
+      const txs = await fetchCloudTransactions();
+      if (isMounted) {
+        setProducts(prods);
+        setTransactions(txs);
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  // Save changes to LocalStorage
+  // Save changes to Cloud & LocalStorage
   const updateProductsState = (newProducts) => {
     setProducts(newProducts);
-    saveProducts(newProducts);
+    pushCloudProducts(newProducts);
   };
 
   const updateTransactionsState = (newTransactions) => {
     setTransactions(newTransactions);
-    saveTransactions(newTransactions);
+    pushCloudTransactions(newTransactions);
   };
 
   // Admin Authentication Handlers (Password: Angel6038@)
@@ -62,8 +91,8 @@ export default function App() {
   const handleResetData = () => {
     if (window.confirm("Adakah anda pasti mahu meriset semula data ke data contoh asal? Semua data baharu akan ditetapkan semula.")) {
       const { products: defaultProducts, transactions: defaultTx } = resetToDefaultData();
-      setProducts(defaultProducts);
-      setTransactions(defaultTx);
+      updateProductsState(defaultProducts);
+      updateTransactionsState(defaultTx);
     }
   };
 
