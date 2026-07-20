@@ -1,7 +1,7 @@
 import { INITIAL_PRODUCTS, INITIAL_TRANSACTIONS } from './initialData';
 
-const PRODUCTS_KEY = 'hne_stock_products_v1';
-const TRANSACTIONS_KEY = 'hne_stock_transactions_v1';
+const PRODUCTS_KEY = 'hne_stock_products_v2';
+const TRANSACTIONS_KEY = 'hne_stock_transactions_v2';
 
 export const getProducts = () => {
   const data = localStorage.getItem(PRODUCTS_KEY);
