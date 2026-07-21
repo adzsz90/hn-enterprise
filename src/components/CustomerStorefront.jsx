@@ -13,7 +13,9 @@ import {
   Trash2,
   Plus,
   Minus,
-  Sparkles
+  Sparkles,
+  ArrowLeft,
+  ZoomIn
 } from 'lucide-react';
 
 export default function CustomerStorefront({ 
@@ -29,6 +31,9 @@ export default function CustomerStorefront({
   // Shopping Cart State
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Fullscreen Image Lightbox State
+  const [fullscreenImage, setFullscreenImage] = useState(null);
 
   // Single Product Checkout / Detail Modal State
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -366,14 +371,19 @@ export default function CustomerStorefront({
                   position: 'relative'
                 }}
               >
-                {/* Photo Frame */}
-                <div style={{ 
-                  position: 'relative', 
-                  width: '100%', 
-                  paddingTop: '133%',
-                  overflow: 'hidden',
-                  background: '#fff0f3' 
-                }}>
+                {/* Photo Frame (Clickable for Fullscreen View) */}
+                <div 
+                  onClick={() => setFullscreenImage({ src: imageSrc, title: product.name, color: product.color })}
+                  style={{ 
+                    position: 'relative', 
+                    width: '100%', 
+                    paddingTop: '133%',
+                    overflow: 'hidden',
+                    background: '#fff0f3',
+                    cursor: 'pointer'
+                  }}
+                  title="Tekan untuk lihat gambar penuh (Full Screen) 🔍"
+                >
                   <img 
                     src={imageSrc} 
                     alt={product.name}
@@ -387,6 +397,24 @@ export default function CustomerStorefront({
                       filter: isSoldOut ? 'grayscale(70%) opacity(0.7)' : 'none'
                     }}
                   />
+
+                  {/* Zoom Indicator Icon */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    right: '8px',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                  }}>
+                    <ZoomIn size={15} />
+                  </div>
 
                   {/* Wishlist Heart Icon */}
                   <div style={{
@@ -668,7 +696,25 @@ export default function CustomerStorefront({
                 <form onSubmit={handleCompleteSingleOrder}>
                   {/* Product Card Overview */}
                   <div style={{ display: 'flex', gap: '0.9rem', background: '#fff5f7', padding: '0.9rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', border: '1px solid #ffccd5', alignItems: 'center' }}>
-                    <div style={{ position: 'relative', width: '75px', height: '100px', flexShrink: 0, borderRadius: '8px', overflow: 'hidden', border: '2px solid #ff85a1', boxShadow: '0 4px 12px rgba(255,133,161,0.2)' }}>
+                    <div 
+                      onClick={() => setFullscreenImage({ 
+                        src: resolveColorImage(selectedProduct, selectedColor), 
+                        title: selectedProduct.name, 
+                        color: selectedColor 
+                      })}
+                      style={{ 
+                        position: 'relative', 
+                        width: '75px', 
+                        height: '100px', 
+                        flexShrink: 0, 
+                        borderRadius: '8px', 
+                        overflow: 'hidden', 
+                        border: '2px solid #ff85a1', 
+                        boxShadow: '0 4px 12px rgba(255,133,161,0.2)',
+                        cursor: 'pointer'
+                      }}
+                      title="Tekan untuk besarkan gambar 🔍"
+                    >
                       <img 
                         src={resolveColorImage(selectedProduct, selectedColor)} 
                         alt={selectedProduct.name} 
@@ -891,6 +937,118 @@ export default function CustomerStorefront({
                   </button>
                 </div>
               </form>
+            )}
+          </div>
+        </div>
+      )}
+      {/* FULLSCREEN IMAGE LIGHTBOX MODAL */}
+      {fullscreenImage && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setFullscreenImage(null)}
+          style={{ 
+            zIndex: 99999, 
+            background: 'rgba(0, 0, 0, 0.92)', 
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem'
+          }}
+        >
+          {/* Top Control Bar with Back Button */}
+          <div style={{ 
+            position: 'absolute', 
+            top: '1.2rem', 
+            left: '1.2rem', 
+            right: '1.2rem', 
+            display: 'flex', 
+            justify: 'space-between', 
+            alignItems: 'center',
+            zIndex: 100000
+          }}>
+            <button 
+              onClick={() => setFullscreenImage(null)}
+              className="btn"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.22)', 
+                color: '#ffffff', 
+                borderRadius: 'var(--radius-full)', 
+                padding: '0.55rem 1.2rem',
+                fontSize: '0.88rem',
+                fontWeight: '700',
+                backdropFilter: 'blur(10px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+              }}
+            >
+              <ArrowLeft size={18} />
+              <span>Kembali ⬅️</span>
+            </button>
+
+            <button 
+              onClick={() => setFullscreenImage(null)}
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.22)', 
+                border: '1.5px solid rgba(255, 255, 255, 0.4)', 
+                color: '#ffffff', 
+                width: '42px', 
+                height: '42px', 
+                borderRadius: '50%', 
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+              }}
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          {/* Big Image Frame */}
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              maxWidth: '92vw', 
+              maxHeight: '82vh', 
+              borderRadius: '16px', 
+              overflow: 'hidden', 
+              boxShadow: '0 15px 50px rgba(0,0,0,0.7)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              background: '#0d0d0d',
+              padding: '0.5rem',
+              border: '1px solid rgba(255,255,255,0.15)'
+            }}
+          >
+            <img 
+              src={fullscreenImage.src} 
+              alt={fullscreenImage.title || 'Produk'} 
+              style={{ 
+                maxWidth: '100%', 
+                maxHeight: '75vh', 
+                objectFit: 'contain', 
+                borderRadius: '12px' 
+              }} 
+            />
+            {fullscreenImage.title && (
+              <div style={{ marginTop: '0.75rem', textAlign: 'center', color: '#ffffff', padding: '0 0.5rem' }}>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '800', fontFamily: 'var(--font-heading)', color: '#ff85a1' }}>
+                  {fullscreenImage.title}
+                </h4>
+                {fullscreenImage.color && (
+                  <span style={{ fontSize: '0.82rem', color: '#e0d6da', fontWeight: '600' }}>
+                    Warna: <strong style={{ color: '#ffffff' }}>{fullscreenImage.color}</strong>
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
