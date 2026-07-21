@@ -14,23 +14,21 @@ export const getProducts = () => {
   }
   try {
     const list = JSON.parse(data);
-    // Purge sample demo products automatically
-    const cleanList = list.filter(p => !SAMPLE_PROD_IDS.includes(p.id));
+    let cleanList = list.filter(p => !SAMPLE_PROD_IDS.includes(p.id));
     
-    // Always sync image and details for default Jubah Parasha
-    const updatedList = cleanList.map(p => {
-      if (p.id === 'prod-jubah-parasha-001') {
-        return { ...p, image: '/images/jubah_plain_parasha.jpg', name: 'Jubah Plain Parasha', discountPrice: 49.00 };
+    // Ensure new items (Green & Maroon Jubah) exist in product list
+    INITIAL_PRODUCTS.forEach(initP => {
+      if (!cleanList.some(p => p.id === initP.id)) {
+        cleanList.push(initP);
       }
-      return p;
     });
 
-    if (updatedList.length === 0) {
+    if (cleanList.length === 0) {
       localStorage.setItem(PRODUCTS_KEY, JSON.stringify(INITIAL_PRODUCTS));
       return INITIAL_PRODUCTS;
     }
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updatedList));
-    return updatedList;
+    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(cleanList));
+    return cleanList;
   } catch (e) {
     console.error("Failed to parse products from LocalStorage", e);
     return INITIAL_PRODUCTS;
@@ -49,8 +47,15 @@ export const getTransactions = () => {
   }
   try {
     const list = JSON.parse(data);
-    // Purge sample demo transactions automatically
-    const cleanList = list.filter(t => !SAMPLE_TX_IDS.includes(t.id));
+    let cleanList = list.filter(t => !SAMPLE_TX_IDS.includes(t.id));
+
+    // Ensure initial transactions exist
+    INITIAL_TRANSACTIONS.forEach(initT => {
+      if (!cleanList.some(t => t.id === initT.id)) {
+        cleanList.push(initT);
+      }
+    });
+
     if (cleanList.length === 0) {
       localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(INITIAL_TRANSACTIONS));
       return INITIAL_TRANSACTIONS;
