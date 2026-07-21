@@ -82,14 +82,17 @@ export default function CustomerStorefront({
     }
     if (color) {
       const normColor = color.toUpperCase();
-      if (normColor.includes('GREEN') || normColor.includes('EMERALD')) {
+      if (normColor.includes('GREEN') || normColor.includes('EMERALD') || normColor.includes('HIJAU')) {
         return '/images/jubah_plain_parasha_green.png';
       }
       if (normColor.includes('MAROON') || normColor.includes('RED') || normColor.includes('MERAH')) {
         return '/images/jubah_plain_parasha_maroon.png';
       }
-      if (normColor.includes('PURPLE') || normColor.includes('DUSTY')) {
-        return '/images/jubah_plain_parasha.jpg';
+      if (normColor.includes('UNGU') || normColor.includes('BIRU') || normColor.includes('BLUE') || normColor.includes('NUDE') || normColor.includes('BEIGE')) {
+        return '/images/jubah_plain_parasha_blue_purple_nude.png';
+      }
+      if (normColor.includes('PINK') || normColor.includes('PURPLE') || normColor.includes('DUSTY')) {
+        return '/images/jubah_plain_parasha_green_pink_maroon.png';
       }
     }
     return product.image || '/images/jubah_plain_parasha.jpg';
