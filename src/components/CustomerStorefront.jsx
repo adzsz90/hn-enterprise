@@ -69,6 +69,27 @@ export default function CustomerStorefront({
     setSelectedColor(colors[0] || 'STANDART');
   };
 
+  // Resolve color specific image dynamically
+  const resolveColorImage = (product, color) => {
+    if (!product) return '/images/jubah_plain_parasha.jpg';
+    if (product.colorImages && color && product.colorImages[color]) {
+      return product.colorImages[color];
+    }
+    if (color) {
+      const normColor = color.toUpperCase();
+      if (normColor.includes('GREEN') || normColor.includes('EMERALD')) {
+        return '/images/jubah_plain_parasha_green.png';
+      }
+      if (normColor.includes('MAROON') || normColor.includes('RED') || normColor.includes('MERAH')) {
+        return '/images/jubah_plain_parasha_maroon.png';
+      }
+      if (normColor.includes('PURPLE') || normColor.includes('DUSTY')) {
+        return '/images/jubah_plain_parasha.jpg';
+      }
+    }
+    return product.image || '/images/jubah_plain_parasha.jpg';
+  };
+
   // Add Item To Cart
   const handleAddToCart = () => {
     if (!selectedProduct) return;
@@ -82,11 +103,13 @@ export default function CustomerStorefront({
       ? selectedProduct.discountPrice 
       : (selectedProduct.sellingPrice || 0);
 
+    const activeImage = resolveColorImage(selectedProduct, selectedColor);
+
     const newItem = {
       cartId: `cart-${Date.now()}-${Math.random()}`,
       productId: selectedProduct.id,
       productName: selectedProduct.name,
-      image: selectedProduct.image,
+      image: activeImage,
       size: selectedSize,
       color: selectedColor,
       quantity: purchaseQty,
@@ -644,14 +667,23 @@ export default function CustomerStorefront({
               ) : (
                 <form onSubmit={handleCompleteSingleOrder}>
                   {/* Product Card Overview */}
-                  <div style={{ display: 'flex', gap: '0.9rem', background: '#fff5f7', padding: '0.9rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', border: '1px solid #ffccd5' }}>
-                    <img src={selectedProduct.image || '/images/oversized_graphic_tee.jpg'} alt="" style={{ width: '65px', height: '85px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <div style={{ display: 'flex', gap: '0.9rem', background: '#fff5f7', padding: '0.9rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', border: '1px solid #ffccd5', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: '75px', height: '100px', flexShrink: 0, borderRadius: '8px', overflow: 'hidden', border: '2px solid #ff85a1', boxShadow: '0 4px 12px rgba(255,133,161,0.2)' }}>
+                      <img 
+                        src={resolveColorImage(selectedProduct, selectedColor)} 
+                        alt={selectedProduct.name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'all 0.3s ease' }} 
+                      />
+                    </div>
                     <div>
                       <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#2b1e22' }}>{selectedProduct.name}</h4>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
                         SKU: {selectedProduct.sku} • Baki Stok: <strong style={{ color: '#2b9348' }}>{selectedProduct.stock} unit</strong>
                       </div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#ff124f', marginTop: '4px' }}>
+                      <div style={{ fontSize: '0.76rem', color: '#7209b7', fontWeight: '700', marginTop: '2px' }}>
+                        🖼️ Gambar Warna: <span>{selectedColor || 'ASAL'}</span>
+                      </div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ff124f', marginTop: '4px', fontFamily: 'var(--font-heading)' }}>
                         RM {unitSellPrice.toFixed(2)}
                       </div>
                     </div>
