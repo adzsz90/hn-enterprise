@@ -16,7 +16,8 @@ export default function AdminLayout({
   onRejectOrder,
   onResetData,
   onLogoutAdmin,
-  onGoToStorefront 
+  onGoToStorefront,
+  isCloudSyncActive = false 
 }) {
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -28,7 +29,7 @@ export default function AdminLayout({
         borderBottom: '2px solid var(--border-color)', 
         padding: '0.8rem 2.5rem', 
         display: 'flex', 
-        justify: 'space-between', 
+        justifyContent: 'space-between', 
         alignItems: 'center',
         boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
       }}>
@@ -37,9 +38,20 @@ export default function AdminLayout({
             <ShieldCheck size={20} />
           </div>
           <div>
-            <span style={{ fontSize: '0.92rem', fontWeight: '800', fontFamily: 'var(--font-heading)', color: '#ff4d6d' }}>
-              PANEL PENGURUSAN ADMIN 🔐
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.92rem', fontWeight: '800', fontFamily: 'var(--font-heading)', color: '#ff4d6d' }}>
+                PANEL PENGURUSAN ADMIN 🔐
+              </span>
+              {isCloudSyncActive ? (
+                <span className="badge" style={{ background: '#e6fffa', color: '#0d9488', border: '1px solid #99f6e4', fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', fontWeight: '700' }}>
+                  ● Live Cloud Sync
+                </span>
+              ) : (
+                <span className="badge" style={{ background: '#f3f4f6', color: '#4b5563', border: '1px solid #e5e7eb', fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', fontWeight: '700' }}>
+                  ● Offline (LocalStorage)
+                </span>
+              )}
+            </div>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', fontWeight: '600' }}>
               Akses Penuh Pengurusan Stok & Kewangan Kedai
             </span>

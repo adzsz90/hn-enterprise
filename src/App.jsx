@@ -13,6 +13,15 @@ import {
   resetToDefaultData 
 } from './utils/storage';
 
+import { 
+  db, 
+  isFirebaseConnected, 
+  syncProductsToCloud, 
+  syncTransactionsToCloud 
+} from './utils/firebaseSync';
+
+import { ref, onValue, set, off } from 'firebase/database';
+
 export default function App() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -31,21 +40,69 @@ export default function App() {
   const [movementType, setMovementType] = useState('STOCK_OUT');
   const [selectedProductForMovement, setSelectedProductForMovement] = useState(null);
 
-  // 1. Load persisted products & transactions from LocalStorage
+  // 1. Load persisted products & transactions (Firebase Live Sync or LocalStorage fallback)
   useEffect(() => {
-    setProducts(getProducts());
-    setTransactions(getTransactions());
+    if (isFirebaseConnected && db) {
+      const productsRef = ref(db, 'products');
+      const transactionsRef = ref(db, 'transactions');
+
+      const unsubscribeProducts = onValue(productsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setProducts(data);
+          saveProducts(data); // Local fallback cache
+        } else {
+          // If Firebase node is empty, seed it with LocalStorage data
+          const localData = getProducts();
+          if (localData.length > 0) {
+            set(productsRef, localData);
+          } else {
+            setProducts([]);
+          }
+        }
+      });
+
+      const unsubscribeTransactions = onValue(transactionsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setTransactions(data);
+          saveTransactions(data); // Local fallback cache
+        } else {
+          const localData = getTransactions();
+          if (localData.length > 0) {
+            set(transactionsRef, localData);
+          } else {
+            setTransactions([]);
+          }
+        }
+      });
+
+      return () => {
+        off(productsRef);
+        off(transactionsRef);
+      };
+    } else {
+      // Offline fallback mode
+      setProducts(getProducts());
+      setTransactions(getTransactions());
+    }
   }, []);
 
-  // Save changes to LocalStorage
+  // Save changes to LocalStorage and Firebase
   const updateProductsState = (newProducts) => {
     setProducts(newProducts);
     saveProducts(newProducts);
+    if (isFirebaseConnected) {
+      syncProductsToCloud(newProducts);
+    }
   };
 
   const updateTransactionsState = (newTransactions) => {
     setTransactions(newTransactions);
     saveTransactions(newTransactions);
+    if (isFirebaseConnected) {
+      syncTransactionsToCloud(newTransactions);
+    }
   };
 
   // Admin Authentication Handlers (Password: Angel6038@)
@@ -278,6 +335,7 @@ export default function App() {
           onResetData={handleResetData}
           onLogoutAdmin={handleLogoutAdmin}
           onGoToStorefront={() => setViewMode('customer')}
+          isCloudSyncActive={isFirebaseConnected}
         />
       )}
 
