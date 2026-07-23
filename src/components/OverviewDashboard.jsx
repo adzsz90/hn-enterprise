@@ -37,8 +37,7 @@ export default function OverviewDashboard({
   // Stock inventory metrics
   const totalProducts = products.length;
   const soldOutProducts = products.filter(p => p.stock === 0);
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= (p.minStock || 5));
-  const inStockProducts = products.filter(p => p.stock > (p.minStock || 5));
+  const stockCostVal = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
 
   // Latest 5 transactions sorted by timestamp
   const latestTransactions = [...transactions]
@@ -241,32 +240,22 @@ export default function OverviewDashboard({
               <Tag size={22} color="#7209b7" />
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Jumlah Jenis</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Jumlah Jenis Produk</div>
               <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#7209b7' }}>{totalProducts} Items</div>
             </div>
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.1rem 1.3rem', cursor: 'pointer' }} onClick={() => setActiveTab('stock')}>
+        <div className="glass-card" style={{ padding: '1.1rem 1.3rem', cursor: 'pointer', background: 'linear-gradient(135deg, #ffffff 0%, #fffbe6 100%)', borderColor: '#ffe066' }} onClick={() => setActiveTab('stock')}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ padding: '0.6rem', borderRadius: '14px', background: 'var(--success-bg)' }}>
-              <PackageCheck size={22} color="#2b9348" />
+            <div style={{ padding: '0.6rem', borderRadius: '14px', background: '#fff3bf', color: '#d97706' }}>
+              <PackageCheck size={22} color="#d97706" />
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Ada Stok 🌸</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#2b9348' }}>{inStockProducts.length} Items</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ padding: '1.1rem 1.3rem', cursor: 'pointer' }} onClick={() => setActiveTab('stock')}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ padding: '0.6rem', borderRadius: '14px', background: 'var(--warning-bg)' }}>
-              <AlertTriangle size={22} color="#d97706" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Stok Amaran ⚠️</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#d97706' }}>{lowStockProducts.length} Items</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Stok Kos (Stock Cost) 📦</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#d97706', fontFamily: 'var(--font-heading)' }}>
+                RM {stockCostVal.toFixed(2)}
+              </div>
             </div>
           </div>
         </div>

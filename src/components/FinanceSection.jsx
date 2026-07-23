@@ -36,17 +36,33 @@ export default function FinanceSection({
 
     let matchesType = true;
     if (txFilter === 'STOCK_OUT') matchesType = t.type === 'STOCK_OUT';
-    else if (txFilter === 'STOCK_IN') matchesType = t.type === 'STOCK_IN';
+    else if (txFilter === 'STOCK_IN') matchesType = (t.type === 'STOCK_IN' || t.type === 'CASH_OUT');
 
     return matchesSearch && matchesType;
   });
 
   // Financial computations (Counts only confirmed / approved transactions)
   const salesTransactions = transactions.filter(t => t.type === 'STOCK_OUT' && (t.status === 'APPROVED' || !t.status));
-  const purchaseTransactions = transactions.filter(t => t.type === 'STOCK_IN' && (t.status === 'APPROVED' || !t.status));
+  const purchaseTransactions = transactions.filter(t => (t.type === 'STOCK_IN' || t.type === 'CASH_OUT') && (t.status === 'APPROVED' || !t.status));
 
   const totalSales = salesTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-  const totalPurchases = purchaseTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+
+  // Cumulative Stock Modal (Never decreases when stock is sold)
+  const cumulativeStockCost = products.reduce((sum, p) => {
+    const pcsSold = salesTransactions
+      .filter(t => t.productId === p.id)
+      .reduce((s, t) => s + (t.quantity || 0), 0);
+    return sum + (((p.stock || 0) + pcsSold) * (p.costPrice || 0));
+  }, 0);
+
+  // Manual Expenses / Cash Out Transactions (excluding RESTOCK-INIT to avoid double counting)
+  const manualExpenseTx = purchaseTransactions.filter(t => t.reference !== 'RESTOCK-INIT');
+  const manualExpenses = manualExpenseTx.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+  const manualExpenseCount = manualExpenseTx.length;
+
+  // Total Cash Out = Cumulative Stock Modal + Any money spent / expenses
+  const totalCashOut = cumulativeStockCost + manualExpenses;
+
   const totalNetProfit = salesTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
   const profitMarginPercent = totalSales > 0 ? ((totalNetProfit / totalSales) * 100).toFixed(1) : 0;
 
@@ -109,7 +125,7 @@ export default function FinanceSection({
             Bahagian Kewangan & Perolehan Jualan 💸
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.2rem', fontWeight: '600' }}>
-            Rekod jualan, rekod kos pembelian stok, untung bersih, serta pengurusan sejarah transaksi.
+            Rekod jualan, rekod penggunaan duit (Cash Out), untung bersih, serta pengurusan sejarah transaksi.
           </p>
         </div>
 
@@ -128,7 +144,7 @@ export default function FinanceSection({
             style={{ background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' }}
           >
             <ArrowDownLeft size={18} />
-            <span>+ Rekod Pembelian Stok (Stock In) 🚚</span>
+            <span>+ Rekod Penggunaan Duit (Cash Out) 💸</span>
           </button>
 
           <button className="btn btn-secondary" onClick={handlePrint}>
@@ -143,57 +159,44 @@ export default function FinanceSection({
         </div>
       </div>
 
-      {/* Main KPI Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
-        {/* Total Sales Card */}
-        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff0f3 100%)', borderColor: '#ffccd5' }}>
-          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            JUMLAH PEROLEHAN JUALAN 💸
+      {/* Main KPI Summary (Cash In & Cash Out) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+        {/* Cash In Card */}
+        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', borderColor: '#b7efc5' }}>
+          <div style={{ fontSize: '0.8rem', color: '#2b9348', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <ArrowUpRight size={18} /> Cash In (Duit Pembelian Pelanggan) 💸
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', marginTop: '0.4rem', color: '#ff4d6d', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '2.1rem', fontWeight: '800', marginTop: '0.4rem', color: '#2b9348', fontFamily: 'var(--font-heading)' }}>
             RM {totalSales.toFixed(2)}
           </div>
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '0.6rem' }}>
-            {salesTransactions.length} transaksi jualan direkodkan.
+            {salesTransactions.length} transaksi jualan disahkan.
           </div>
         </div>
 
-        {/* Total Cost of Pembelian Card */}
-        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fffbe6 100%)', borderColor: '#ffe066' }}>
-          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            KOS PEMBELIAN STOK 📦
+        {/* Cash Out Card (Stock Cost Modal + Money Spent) */}
+        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff0f3 100%)', borderColor: '#ffccd5' }}>
+          <div style={{ fontSize: '0.8rem', color: '#ff124f', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <ArrowDownLeft size={18} /> Cash Out (Modal Stok & Pengeluaran Duit) 🚚
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', marginTop: '0.4rem', color: '#d97706', fontFamily: 'var(--font-heading)' }}>
-            RM {totalPurchases.toFixed(2)}
+          <div style={{ fontSize: '2.1rem', fontWeight: '800', marginTop: '0.4rem', color: '#ff124f', fontFamily: 'var(--font-heading)' }}>
+            RM {totalCashOut.toFixed(2)}
           </div>
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '0.6rem' }}>
-            {purchaseTransactions.length} transaksi belian stok direkodkan.
+            Modal Stok (RM {cumulativeStockCost.toFixed(2)}) + {manualExpenseCount} rekod perbelanjaan (RM {manualExpenses.toFixed(2)}).
           </div>
         </div>
 
         {/* Net Profit Card */}
-        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0fff4 100%)', borderColor: '#b7efc5' }}>
-          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fffbe6 100%)', borderColor: '#ffe066' }}>
+          <div style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: '800', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
             UNTUNG BERSIH (NET PROFIT) 💖
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', marginTop: '0.4rem', color: '#2b9348', fontFamily: 'var(--font-heading)' }}>
+          <div style={{ fontSize: '2.1rem', fontWeight: '800', marginTop: '0.4rem', color: '#d97706', fontFamily: 'var(--font-heading)' }}>
             RM {totalNetProfit.toFixed(2)}
           </div>
-          <div style={{ fontSize: '0.82rem', color: '#2b9348', fontWeight: '700', marginTop: '0.6rem' }}>
+          <div style={{ fontSize: '0.82rem', color: '#d97706', fontWeight: '700', marginTop: '0.6rem' }}>
             Margin Keuntungan: {profitMarginPercent}% ✨
-          </div>
-        </div>
-
-        {/* Potential Inventory Sales Value Card */}
-        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #f3e8ff 100%)', borderColor: '#d8bbff' }}>
-          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
-            NILAI JUALAN BAKI INVENTORI 🛍️
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: '800', marginTop: '0.4rem', color: '#7209b7', fontFamily: 'var(--font-heading)' }}>
-            RM {totalInventoryRetailValue.toFixed(2)}
-          </div>
-          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: '600', marginTop: '0.6rem' }}>
-            Anggaran nilai jualan baki stok gudang.
           </div>
         </div>
       </div>
@@ -213,9 +216,9 @@ export default function FinanceSection({
               onChange={(e) => setTxFilter(e.target.value)}
               style={{ width: 'auto', fontSize: '0.85rem', padding: '0.45rem 1rem', borderRadius: 'var(--radius-full)' }}
             >
-              <option value="ALL">🌸 Semua Transaksi (Jualan & Belian)</option>
-              <option value="STOCK_OUT">🛍️ Jualan (Stock Out)</option>
-              <option value="STOCK_IN">🚚 Pembelian Stok (Stock In)</option>
+              <option value="ALL">🌸 Semua Transaksi (Cash In & Cash Out)</option>
+              <option value="STOCK_OUT">🛍️ Cash In (Jualan Pelanggan)</option>
+              <option value="STOCK_IN">💸 Cash Out (Penggunaan Duit / Perbelanjaan)</option>
             </select>
 
             <div style={{ position: 'relative', width: '220px' }}>
@@ -258,6 +261,7 @@ export default function FinanceSection({
               ) : (
                 filteredTransactions.map((tx) => {
                   const isOut = tx.type === 'STOCK_OUT';
+                  const isCashOut = tx.type === 'CASH_OUT';
                   const isPending = tx.status === 'PENDING_APPROVAL';
                   const isRejected = tx.status === 'REJECTED';
 
@@ -272,6 +276,10 @@ export default function FinanceSection({
                           <span className="badge badge-sold-out">
                             ❌ Dibatalkan
                           </span>
+                        ) : isCashOut ? (
+                          <span className="badge" style={{ background: '#ffe5ec', color: '#ff124f', border: '1px solid #ffccd5', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontWeight: '700' }}>
+                            <ArrowDownLeft size={13} /> Cash Out (Penggunaan Duit)
+                          </span>
                         ) : (
                           <span className={`badge ${isOut ? 'badge-stock-out' : 'badge-stock-in'}`}>
                             {isOut ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}
@@ -280,11 +288,11 @@ export default function FinanceSection({
                         )}
                       </td>
                       <td style={{ fontWeight: '700', color: '#33272a' }}>{tx.productName}</td>
-                      <td style={{ fontWeight: '800', color: isOut ? '#ff124f' : '#2b9348' }}>
-                        {isOut ? `-${tx.quantity}` : `+${tx.quantity}`} unit
+                      <td style={{ fontWeight: '800', color: isOut ? '#ff124f' : isCashOut ? 'var(--text-muted)' : '#2b9348' }}>
+                        {isCashOut ? '-' : `${isOut ? '-' : '+'}${tx.quantity} unit`}
                       </td>
                       <td>RM {Number(tx.unitPrice).toFixed(2)}</td>
-                      <td style={{ fontWeight: '800', color: isOut ? '#2b9348' : '#d97706', fontFamily: 'var(--font-heading)' }}>
+                      <td style={{ fontWeight: '800', color: isOut ? '#2b9348' : '#ff124f', fontFamily: 'var(--font-heading)' }}>
                         {isOut ? '+' : '-'} RM {Number(tx.totalAmount).toFixed(2)}
                       </td>
                       <td style={{ fontWeight: '800', color: isOut ? '#2b9348' : 'var(--text-muted)', fontSize: '0.88rem' }}>
@@ -314,43 +322,6 @@ export default function FinanceSection({
         </div>
       </div>
 
-      {/* Category Breakdown Performance */}
-      <div className="glass-card">
-        <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <PieChart size={22} color="#7209b7" />
-          <span>Pecahan Nilai Modal & Potensi Jualan Inventori 🏷️</span>
-        </h3>
-
-        <div className="table-container">
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Kategori Produk</th>
-                <th>Bilangan SKU</th>
-                <th>Jumlah Baki Unit</th>
-                <th>Nilai Modal Restock (RM)</th>
-                <th>Nilai Jualan (RM)</th>
-                <th>Potensi Profit (RM)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(categoryStats).map(([catName, stat]) => {
-                const profit = stat.retailValue - stat.costValue;
-                return (
-                  <tr key={catName}>
-                    <td style={{ fontWeight: '700', color: '#33272a' }}>{catName}</td>
-                    <td>{stat.itemCount} jenis</td>
-                    <td style={{ fontWeight: '700', color: '#7209b7' }}>{stat.totalStock} unit</td>
-                    <td>RM {stat.costValue.toFixed(2)}</td>
-                    <td style={{ fontWeight: '700' }}>RM {stat.retailValue.toFixed(2)}</td>
-                    <td style={{ fontWeight: '800', color: '#2b9348' }}>+RM {profit.toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

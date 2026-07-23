@@ -6,13 +6,12 @@ import ProductModal from './components/ProductModal';
 import StockMovementModal from './components/StockMovementModal';
 
 import { 
-  fetchCloudProducts, 
-  pushCloudProducts, 
-  fetchCloudTransactions, 
-  pushCloudTransactions 
-} from './utils/cloudSync';
-
-import { resetToDefaultData } from './utils/storage';
+  getProducts, 
+  saveProducts, 
+  getTransactions, 
+  saveTransactions, 
+  resetToDefaultData 
+} from './utils/storage';
 
 export default function App() {
   const [products, setProducts] = useState([]);
@@ -32,48 +31,21 @@ export default function App() {
   const [movementType, setMovementType] = useState('STOCK_OUT');
   const [selectedProductForMovement, setSelectedProductForMovement] = useState(null);
 
-  // 1. Initial Load & Realtime Polling Sync (Every 5 seconds)
+  // 1. Load persisted products & transactions from LocalStorage
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCloudData = async () => {
-      setIsSyncing(true);
-      const prods = await fetchCloudProducts();
-      const txs = await fetchCloudTransactions();
-      if (isMounted) {
-        setProducts(prods);
-        setTransactions(txs);
-        setIsSyncing(false);
-      }
-    };
-
-    loadCloudData();
-
-    // Auto sync interval every 5 seconds across all devices
-    const interval = setInterval(async () => {
-      const prods = await fetchCloudProducts();
-      const txs = await fetchCloudTransactions();
-      if (isMounted) {
-        setProducts(prods);
-        setTransactions(txs);
-      }
-    }, 5000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    setProducts(getProducts());
+    setTransactions(getTransactions());
   }, []);
 
-  // Save changes to Cloud & LocalStorage
+  // Save changes to LocalStorage
   const updateProductsState = (newProducts) => {
     setProducts(newProducts);
-    pushCloudProducts(newProducts);
+    saveProducts(newProducts);
   };
 
   const updateTransactionsState = (newTransactions) => {
     setTransactions(newTransactions);
-    pushCloudTransactions(newTransactions);
+    saveTransactions(newTransactions);
   };
 
   // Admin Authentication Handlers (Password: Angel6038@)
@@ -103,15 +75,42 @@ export default function App() {
   };
 
   const handleSaveProduct = (productData) => {
-    const existingIndex = products.findIndex(p => p.id === productData.id);
-    let updatedList;
-    if (existingIndex >= 0) {
-      updatedList = [...products];
-      updatedList[existingIndex] = productData;
-    } else {
-      updatedList = [productData, ...products];
-    }
+    const itemsToAdd = Array.isArray(productData) ? productData : [productData];
+    let updatedList = [...products];
+    let newTransactionsToPush = [];
+
+    itemsToAdd.forEach(item => {
+      const existingIndex = updatedList.findIndex(p => p.id === item.id);
+      if (existingIndex >= 0) {
+        updatedList[existingIndex] = item;
+      } else {
+        updatedList = [item, ...updatedList];
+
+        // Automatically create a STOCK_IN transaction for newly added stock so Cash Out in Finance auto-reflects the modal!
+        if (item.stock > 0 && item.costPrice > 0) {
+          newTransactionsToPush.push({
+            id: `tx-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            type: 'STOCK_IN',
+            productId: item.id,
+            productName: item.name,
+            quantity: item.stock,
+            unitPrice: item.costPrice,
+            totalAmount: item.stock * item.costPrice,
+            profit: 0,
+            party: 'Modal Stok Awal / Restock',
+            reference: 'RESTOCK-INIT',
+            status: 'APPROVED',
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    });
+
     updateProductsState(updatedList);
+
+    if (newTransactionsToPush.length > 0) {
+      updateTransactionsState([...newTransactionsToPush, ...transactions]);
+    }
   };
 
   const handleDeleteProduct = (productId) => {
@@ -200,20 +199,22 @@ export default function App() {
     const updatedTx = [approvedTx, ...transactions];
     updateTransactionsState(updatedTx);
 
-    // Adjust product stock
-    const targetProduct = products.find(p => p.id === newTx.productId);
-    if (targetProduct) {
-      let newStock = targetProduct.stock;
-      if (newTx.type === 'STOCK_OUT') {
-        newStock = Math.max(0, targetProduct.stock - newTx.quantity);
-      } else if (newTx.type === 'STOCK_IN') {
-        newStock = targetProduct.stock + newTx.quantity;
-      }
+    // Adjust product stock (Only for STOCK_OUT and STOCK_IN, not CASH_OUT expenses)
+    if (newTx.productId && newTx.type !== 'CASH_OUT') {
+      const targetProduct = products.find(p => p.id === newTx.productId);
+      if (targetProduct) {
+        let newStock = targetProduct.stock;
+        if (newTx.type === 'STOCK_OUT') {
+          newStock = Math.max(0, targetProduct.stock - newTx.quantity);
+        } else if (newTx.type === 'STOCK_IN') {
+          newStock = targetProduct.stock + newTx.quantity;
+        }
 
-      const updatedProducts = products.map(p => 
-        p.id === newTx.productId ? { ...p, stock: newStock } : p
-      );
-      updateProductsState(updatedProducts);
+        const updatedProducts = products.map(p => 
+          p.id === newTx.productId ? { ...p, stock: newStock } : p
+        );
+        updateProductsState(updatedProducts);
+      }
     }
   };
 

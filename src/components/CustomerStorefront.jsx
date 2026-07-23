@@ -58,20 +58,57 @@ export default function CustomerStorefront({
     return matchesSearch && matchesCategory;
   });
 
-  // Open Product Modal and parse sizes & colors
-  const handleOpenBuyModal = (prod) => {
-    if (prod.stock === 0) return;
-    setSelectedProduct(prod);
+  // Group products into single collections (strips brackets e.g. "Jubah Plain Parasha (Ungu)" -> "Jubah Plain Parasha")
+  const groupedCollections = React.useMemo(() => {
+    const map = new Map();
+
+    filteredProducts.forEach(item => {
+      const cleanName = item.name.replace(/\s*\([^)]*\)/g, '').trim() || item.name;
+      if (!map.has(cleanName)) {
+        map.set(cleanName, {
+          groupId: `group-${cleanName}`,
+          mainName: cleanName,
+          category: item.category,
+          description: item.description,
+          coverImage: item.image || '/images/jubah_plain_parasha.jpg',
+          variants: [item]
+        });
+      } else {
+        const grp = map.get(cleanName);
+        grp.variants.push(item);
+        if (!grp.coverImage && item.image) grp.coverImage = item.image;
+      }
+    });
+
+    return Array.from(map.values());
+  }, [filteredProducts]);
+
+  // Group modal state
+  const [selectedGroup, setSelectedGroup] = useState(null);
+
+  // Open Product Modal for a grouped collection
+  const handleOpenGroupBuyModal = (group) => {
+    if (!group || !group.variants || group.variants.length === 0) return;
+    const firstVariant = group.variants[0];
+    setSelectedGroup(group);
+    setSelectedProduct(firstVariant);
     setPurchaseQty(1);
     setOrderSuccessMsg(false);
 
-    // Parse available sizes
-    const sizes = prod.size ? prod.size.split(',').map(s => s.trim()).filter(Boolean) : ['FREE SIZE'];
+    const sizes = firstVariant.size ? firstVariant.size.split(',').map(s => s.trim()).filter(Boolean) : ['FREE SIZE'];
     setSelectedSize(sizes[0] || 'FREE SIZE');
 
-    // Parse available colors
-    const colors = prod.color ? prod.color.split(',').map(c => c.trim()).filter(Boolean) : ['STANDART'];
-    setSelectedColor(colors[0] || 'STANDART');
+    const colorLabel = firstVariant.color || firstVariant.name || 'Standard';
+    setSelectedColor(colorLabel);
+  };
+
+  // Switch variant inside grouped purchase modal
+  const handleSelectVariantInGroup = (variant) => {
+    setSelectedProduct(variant);
+    const sizes = variant.size ? variant.size.split(',').map(s => s.trim()).filter(Boolean) : ['FREE SIZE'];
+    setSelectedSize(sizes[0] || 'FREE SIZE');
+    const colorLabel = variant.color || variant.name || 'Standard';
+    setSelectedColor(colorLabel);
   };
 
   // Resolve color specific image dynamically
@@ -347,22 +384,26 @@ export default function CustomerStorefront({
         </div>
       </div>
 
-      {/* Product Lookbook Grid */}
+        {/* Product Lookbook Grid (Grouped by Main Product Collection) */}
       <div className="mobile-storefront-grid">
-        {filteredProducts.length === 0 ? (
+        {groupedCollections.length === 0 ? (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem', background: '#ffffff', borderRadius: 'var(--radius-md)', border: '2px dashed #ffccd5' }}>
             <Package size={38} color="#ff4d6d" style={{ opacity: 0.4, marginBottom: '0.5rem' }} />
             <div style={{ fontSize: '1rem', fontWeight: '700', color: '#ff4d6d' }}>Tiada koleksi dijumpai 🌸</div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Sila cuba carian lain.</p>
           </div>
         ) : (
-          filteredProducts.map((product) => {
-            const isSoldOut = product.stock === 0;
-            const imageSrc = product.image || '/images/oversized_graphic_tee.jpg';
+          groupedCollections.map((group) => {
+            const firstVariant = group.variants[0];
+            const isSoldOut = group.variants.every(v => v.stock === 0);
+            const imageSrc = group.coverImage || firstVariant.image || '/images/jubah_plain_parasha.jpg';
+            const displayPrice = firstVariant.discountPrice && firstVariant.discountPrice > 0 
+              ? firstVariant.discountPrice 
+              : (firstVariant.sellingPrice || 49);
 
             return (
               <div 
-                key={product.id} 
+                key={group.groupId} 
                 style={{
                   background: '#ffffff',
                   border: '2px solid var(--border-color)',
@@ -376,7 +417,7 @@ export default function CustomerStorefront({
               >
                 {/* Photo Frame (Clickable for Fullscreen View) */}
                 <div 
-                  onClick={() => setFullscreenImage({ src: imageSrc, title: product.name, color: product.color })}
+                  onClick={() => setFullscreenImage({ src: imageSrc, title: group.mainName, color: `${group.variants.length} Variasi Warna` })}
                   style={{ 
                     position: 'relative', 
                     width: '100%', 
@@ -389,7 +430,7 @@ export default function CustomerStorefront({
                 >
                   <img 
                     src={imageSrc} 
-                    alt={product.name}
+                    alt={group.mainName}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -446,14 +487,14 @@ export default function CustomerStorefront({
                     ) : (
                       <span style={{ 
                         background: 'rgba(255, 255, 255, 0.92)', 
-                        color: '#33272a', 
-                        fontSize: '0.65rem', 
+                        color: '#ff124f', 
+                        fontSize: '0.68rem', 
                         fontWeight: '800', 
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '3px',
-                        textTransform: 'uppercase'
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: 'var(--radius-full)',
+                        border: '1px solid #ffccd5'
                       }}>
-                        IN DEMAND
+                        ● {group.variants.length} Variasi Warna & Saiz
                       </span>
                     )}
                   </div>
@@ -463,57 +504,40 @@ export default function CustomerStorefront({
                 <div style={{ padding: '0.85rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: '700', marginBottom: '0.2rem' }}>
-                      {product.category.toUpperCase()}
+                      {(group.category || 'JUBAH').toUpperCase()}
                     </div>
 
                     <h4 style={{ 
-                      fontSize: '0.85rem', 
-                      fontWeight: '700', 
+                      fontSize: '0.9rem', 
+                      fontWeight: '800', 
                       textTransform: 'uppercase', 
                       lineHeight: '1.25',
                       color: isSoldOut ? '#888' : '#2b1e22',
-                      marginBottom: '0.35rem',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
+                      marginBottom: '0.35rem'
                     }}>
-                      {product.name}
+                      {group.mainName}
                     </h4>
 
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '0.4rem' }}>
-                      SAIZ: <span style={{ color: '#ff4d6d', fontWeight: '700' }}>{product.size || '-'}</span>
+                    <div style={{ fontSize: '0.75rem', color: '#7209b7', fontWeight: '700', marginBottom: '0.5rem' }}>
+                      🎨 {group.variants.map(v => v.color).filter(Boolean).join(', ')}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                      {product.discountPrice ? (
-                        <>
-                          <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ff124f', fontFamily: 'var(--font-heading)' }}>
-                            RM {Number(product.discountPrice).toFixed(2)}
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: '#a899a0', textDecoration: 'line-through', fontWeight: '600' }}>
-                            RM {Number(product.sellingPrice).toFixed(2)}
-                          </span>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ff124f', fontFamily: 'var(--font-heading)' }}>
-                          RM {Number(product.sellingPrice).toFixed(2)}
-                        </span>
-                      )}
+                    <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ff124f', fontFamily: 'var(--font-heading)' }}>
+                      RM {displayPrice.toFixed(2)}
                     </div>
                   </div>
 
                   {/* Customer Purchase / Add to Cart Trigger Button */}
                   <button 
                     className="btn btn-primary"
+                    onClick={() => handleOpenGroupBuyModal(group)}
                     disabled={isSoldOut}
-                    onClick={() => handleOpenBuyModal(product)}
                     style={{ 
                       width: '100%', 
-                      opacity: isSoldOut ? 0.45 : 1, 
-                      borderRadius: 'var(--radius-full)',
+                      marginTop: '0.75rem', 
+                      fontSize: '0.82rem',
                       padding: '0.55rem 0.5rem',
-                      fontSize: '0.8rem'
+                      borderRadius: 'var(--radius-full)'
                     }}
                   >
                     <ShoppingBag size={14} />
@@ -729,18 +753,56 @@ export default function CustomerStorefront({
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
                         SKU: {selectedProduct.sku} • Baki Stok: <strong style={{ color: '#2b9348' }}>{selectedProduct.stock} unit</strong>
                       </div>
-                      <div style={{ fontSize: '0.76rem', color: '#7209b7', fontWeight: '700', marginTop: '2px' }}>
-                        🖼️ Gambar Warna: <span>{selectedColor || 'ASAL'}</span>
-                      </div>
                       <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#ff124f', marginTop: '4px', fontFamily: 'var(--font-heading)' }}>
                         RM {unitSellPrice.toFixed(2)}
                       </div>
                     </div>
                   </div>
 
-                  {/* 1. SELECTION: SAIZ PAKAIAN (Tally with stock entry) */}
-                  <div className="form-group">
-                    <label style={{ fontWeight: '700', fontSize: '0.85rem' }}>Pilih Saiz Pakaian *</label>
+                  {/* 1. SELECTION: WARNA / VARIASI STOK & GAMBAR */}
+                  {selectedGroup && selectedGroup.variants && selectedGroup.variants.length > 1 && (
+                    <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+                      <label style={{ fontWeight: '800', fontSize: '0.88rem', color: '#ff124f' }}>
+                        1. Pilih Warna / Gambar Baju *
+                      </label>
+                      <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        {selectedGroup.variants.map((variantItem) => {
+                          const isSelected = selectedProduct && selectedProduct.id === variantItem.id;
+                          const colorLabel = variantItem.color || variantItem.name;
+
+                          return (
+                            <button
+                              key={variantItem.id}
+                              type="button"
+                              onClick={() => handleSelectVariantInGroup(variantItem)}
+                              style={{
+                                border: isSelected ? '2px solid #ff4d6d' : '1.5px solid #ffccd5',
+                                background: isSelected ? '#ff4d6d' : '#ffffff',
+                                color: isSelected ? '#ffffff' : '#2b1e22',
+                                padding: '0.45rem 0.9rem',
+                                borderRadius: 'var(--radius-full)',
+                                fontWeight: '700',
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isSelected ? '0 4px 12px rgba(255,77,109,0.3)' : 'none'
+                              }}
+                            >
+                              {isSelected && <Check size={14} />}
+                              <span>{colorLabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. SELECTION: SAIZ PAKAIAN (Tally with stock entry) */}
+                  <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+                    <label style={{ fontWeight: '800', fontSize: '0.88rem' }}>2. Pilih Saiz Pakaian *</label>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
                       {availableSizes.map(sz => {
                         const isSelected = selectedSize === sz;
@@ -762,36 +824,6 @@ export default function CustomerStorefront({
                             }}
                           >
                             {sz}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 2. SELECTION: WARNA / VARIATION (Tally with stock entry) */}
-                  <div className="form-group">
-                    <label style={{ fontWeight: '700', fontSize: '0.85rem' }}>Pilih Warna / Variation *</label>
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
-                      {availableColors.map(col => {
-                        const isSelected = selectedColor === col;
-                        return (
-                          <button
-                            key={col}
-                            type="button"
-                            onClick={() => setSelectedColor(col)}
-                            style={{
-                              border: isSelected ? '2px solid #7209b7' : '1.5px solid var(--border-color)',
-                              background: isSelected ? '#7209b7' : '#ffffff',
-                              color: isSelected ? '#ffffff' : 'var(--text-main)',
-                              padding: '0.45rem 0.95rem',
-                              borderRadius: 'var(--radius-full)',
-                              fontWeight: '700',
-                              fontSize: '0.82rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {col}
                           </button>
                         );
                       })}

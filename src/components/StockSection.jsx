@@ -38,16 +38,16 @@ export default function StockSection({
     return matchesSearch && matchesStatus;
   });
 
-  // Filter Stock In transactions (Pembelian Stok / Restock)
+  // Calculations
   const stockInTransactions = transactions
     .filter(t => t.type === 'STOCK_IN')
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-  const totalRestockCost = stockInTransactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-  const totalRestockUnits = stockInTransactions.reduce((sum, t) => sum + (t.quantity || 0), 0);
-
-  const soldOutItems = products.filter(p => p.stock === 0);
-  const lowStockItems = products.filter(p => p.stock > 0 && p.stock <= (p.minStock || 5));
+  const stockCostVal = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.costPrice || 0)), 0);
+  const totalUnitsSold = transactions
+    .filter(t => t.type === 'STOCK_OUT' && (t.status === 'APPROVED' || !t.status))
+    .reduce((sum, t) => sum + (t.quantity || 0), 0);
+  const totalCurrentStockPcs = products.reduce((sum, p) => sum + (p.stock || 0), 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8rem' }}>
@@ -58,7 +58,7 @@ export default function StockSection({
             Bahagian Pengurusan Stok 📦
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.2rem', fontWeight: '600' }}>
-            Tambah pakaian baharu (upload gambar), kemas kini stok, restock (Stock In), dan pelarasan stok.
+            Tambah pakaian baharu (upload gambar), kemas kini stok, dan kawal nilai inventori.
           </p>
         </div>
 
@@ -68,64 +68,34 @@ export default function StockSection({
             onClick={() => onOpenProductModal(null)}
           >
             <Plus size={18} />
-            <span>+ Tambah Pakaian / Gambar Baru 👚</span>
-          </button>
-
-          <button 
-            className="btn btn-secondary"
-            onClick={() => onOpenMovementModal('STOCK_IN')}
-            style={{ borderColor: '#b7efc5', color: '#2b9348', background: '#e8fccf' }}
-          >
-            <ArrowDownLeft size={18} />
-            <span>+ Restock (Stock In) 🚚</span>
-          </button>
-
-          <button 
-            className="btn btn-secondary"
-            onClick={() => onOpenMovementModal('STOCK_OUT')}
-            style={{ borderColor: '#ffccd5', color: '#ff4d6d', background: '#fff0f3' }}
-          >
-            <ArrowUpRight size={18} />
-            <span>- Buang Stok 📤</span>
+            <span>+ Add Item / Tambah Stok Baru 👚</span>
           </button>
         </div>
       </div>
 
       {/* Stock Summary Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
         <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fffbe6 100%)', borderColor: '#ffe066' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-            JUMLAH PERBELANJAAN RESTOCK 🚚
+          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+            Stok Kos (Stock Cost) 📦
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: '800', marginTop: '0.3rem', color: '#d97706', fontFamily: 'var(--font-heading)' }}>
-            RM {totalRestockCost.toFixed(2)}
+            RM {stockCostVal.toFixed(2)}
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: '600' }}>
-            {totalRestockUnits} unit stok dimasukkan.
+            Current Stock × Harga Kos ({totalCurrentStockPcs} unit)
           </div>
         </div>
 
         <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fff0f3 100%)', borderColor: '#ffccd5' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-            KEHABISAN STOK (SOLD OUT) 🎀
+          <div style={{ fontSize: '0.8rem', color: '#7c6c72', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-heading)' }}>
+            Stok Dijual (Pcs) 🛍️
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', marginTop: '0.3rem', color: '#ff124f', fontFamily: 'var(--font-heading)' }}>
-            {soldOutItems.length} Produk
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#ff124f', marginTop: '0.4rem', fontWeight: '700' }}>
-            Perlu restock segera!
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fffbf0 100%)', borderColor: '#ffe066' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-            STOK AMARAN (LOW STOCK) ⚠️
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '800', marginTop: '0.3rem', color: '#d97706', fontFamily: 'var(--font-heading)' }}>
-            {lowStockItems.length} Produk
+          <div style={{ fontSize: '1.8rem', fontWeight: '800', marginTop: '0.3rem', color: '#ff4d6d', fontFamily: 'var(--font-heading)' }}>
+            {totalUnitsSold} Pcs
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem', fontWeight: '600' }}>
-            Baki stok di bawah threshold.
+            Jumlah bilangan unit produk yang telah terjual.
           </div>
         </div>
       </div>
